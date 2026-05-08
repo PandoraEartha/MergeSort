@@ -13,6 +13,8 @@ MergeSort(array.data(),array.size());
 
 100000000 `unsigned` array, test on 9950x3D with g++ `-O2`
 
+<img width="2544" height="434" alt="sort_comparison" src="https://github.com/user-attachments/assets/d720d905-a455-443a-88ce-3d44d2d62c6f" />
+
 ### Random array
 
 `MergeSort`: 4.967 second
