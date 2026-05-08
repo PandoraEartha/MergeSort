@@ -2,7 +2,7 @@
 
 ## Usage
 
-```
+```c++
 #include "MergeSort.h"
 
 std::vector<double> array(12345678);
@@ -19,3 +19,20 @@ MergeSort(array.data(),array.size());
 
 `std::sort`: 5.605 second
 
+### 80% sorted array
+
+`MergeSort`: 2.755 second
+
+`std::sort`: 3.713 second
+
+### Sorted array
+
+`MergeSort`: 0.020 second
+
+`std::sort`: 0.756 second
+
+### Reversed array
+
+`MergeSort`: 0.036 second
+
+`std::sort`: 0.502 second
