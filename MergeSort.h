@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <algorithm>
 #include <new>
+#include <sys/time.h>
 
 template<typename Type>
 static inline void MergeSort(Type* array,const unsigned long long length);
@@ -111,14 +112,16 @@ static inline void InsertSort(Type* array,const unsigned char length){
     for(unsigned index=1;index<length;index=index+1){
         const Type temporary=std::move(array[index]);
         unsigned indexCompare=index-1;
+        unsigned add=1;
         while(array[indexCompare]>temporary){
             array[indexCompare+1]=std::move(array[indexCompare]);
             if(!indexCompare){
+                add=0;
                 break;
             }
             indexCompare=indexCompare-1;
         }
-        array[indexCompare]=std::move(temporary);
+        array[indexCompare+add]=std::move(temporary);
     }
 }
 
@@ -147,18 +150,7 @@ static inline void SmallSizeSort(Type* array){
     #endif
     #if 1
     // insert sort
-    #if 0
-    for(unsigned index=1;index<SmallSortLength;index=index+1){
-        Type biggest=array[index];
-        unsigned long long indexInsert=BinarySearch(array,biggest,index);
-        for(unsigned long long indexSwap=index;indexSwap>indexInsert;indexSwap=indexSwap-1){
-            array[indexSwap]=array[indexSwap-1];
-        }
-        array[indexInsert]=biggest;
-    }
-    #else
     InsertSort(array,SmallSortLength);
-    #endif
     #endif
     #if 0
     CompareSwap(array,0, 1);CompareSwap(array, 2, 3);CompareSwap(array, 4, 5);CompareSwap(array, 6, 7);
