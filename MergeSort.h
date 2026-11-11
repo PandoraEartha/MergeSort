@@ -43,8 +43,15 @@ static inline bool Compare(const Type* array0,const Type* array1,const unsigned 
 
 template<typename Type>
 static inline void CompareSwap(Type* array,const unsigned long long index0,const unsigned long long index1){
-    if(array[index0]>array[index1]){
-        Swap(array,index0,index1);
+    if constexpr(std::is_trivially_copyable_v<Type>){
+        const Type value0=array[index0];
+        const Type value1=array[index1];
+        array[index0]=value0<value1?value0:value1;
+        array[index1]=value0<value1?value1:value0;
+    }else{
+        if(array[index0]>array[index1]){
+            Swap(array,index0,index1);
+        }
     }
 }
 
@@ -75,7 +82,7 @@ static inline Type* MemoryAllocate(const unsigned long long count){
 template<typename Type>
 static inline void MemoryFree(Type* pointer,const unsigned long long count){
     for(unsigned long long index=0;index<count;index=index+1){
-        pointer[count].~Type();
+        pointer[index].~Type();
     }
     free(pointer);
 }
@@ -148,11 +155,12 @@ static inline void SmallSizeSort(Type* array){
         }
     }
     #endif
-    #if 1
+    #if 0
     // insert sort
     InsertSort(array,SmallSortLength);
     #endif
-    #if 0
+    #if 1
+    // sorting network for 16 elements, all comparisons are branchless
     CompareSwap(array,0, 1);CompareSwap(array, 2, 3);CompareSwap(array, 4, 5);CompareSwap(array, 6, 7);
     CompareSwap(array,8, 9);CompareSwap(array,10,11);CompareSwap(array,12,13);CompareSwap(array,14,15);
     CompareSwap(array,0, 2);CompareSwap(array, 1, 3);CompareSwap(array, 4, 6);CompareSwap(array, 5, 7);
@@ -211,11 +219,58 @@ static inline void ClearStack(MergeSortStack<Type>* stack){
     stack->length=0;
 }
 
+// sample adjacent pairs, branchy merge is faster when the input is mostly ordered
 template<typename Type>
-static inline void Merge(Type* mergeArray0,Type* mergeArray1,Type* mergeCopyArray,const unsigned long long mergeLength0,const unsigned long long mergeLength1){
+static inline bool MostlyOrdered(const Type* array,const unsigned long long length){
+    const unsigned long long sampleCount=4096;
+    unsigned long long step=(length-1)/sampleCount;
+    if(!step){
+        step=1;
+    }
+    unsigned long long disorder=0;
+    unsigned long long samples=0;
+    for(unsigned long long index=step;index<length;index=index+step){
+        if(array[index-1]>array[index]){
+            disorder=disorder+1;
+        }
+        samples=samples+1;
+    }
+    return disorder*3<samples;
+}
+
+template<typename Type>
+static inline void Merge(Type* mergeArray0,Type* mergeArray1,Type* mergeCopyArray,const unsigned long long mergeLength0,const unsigned long long mergeLength1,const bool useBranchyMerge){
     unsigned long long index0=0;
     unsigned long long index1=0;
     unsigned long long indexCopy=0;
+    if constexpr(std::is_trivially_copyable_v<Type>){
+        if(!useBranchyMerge){
+            // branchless merge, the next element is selected with conditional moves
+            Type* end0=mergeArray0+mergeLength0;
+            Type* end1=mergeArray1+mergeLength1;
+            Type* output=mergeCopyArray;
+            while(mergeArray0<end0&&mergeArray1<end1){
+                const Type value0=*(mergeArray0);
+                const Type value1=*(mergeArray1);
+                const bool takeSecond=value1<value0;
+                if(takeSecond){
+                    *(output)=value1;
+                }else{
+                    *(output)=value0;
+                }
+                const unsigned long long advance=(unsigned long long)takeSecond;
+                mergeArray0=mergeArray0+1-advance;
+                mergeArray1=mergeArray1+0+advance;
+                output=output+1;
+            }
+            if(mergeArray0<end0){
+                MemoryCopy(output,mergeArray0,(unsigned long long)(end0-mergeArray0));
+            }else{
+                MemoryCopy(output,mergeArray1,(unsigned long long)(end1-mergeArray1));
+            }
+            return;
+        }
+    }
     while(true){
         if(Compare(mergeArray0,mergeArray1,index0,index1)){
             mergeCopyArray[indexCopy]=std::move(mergeArray0[index0]);
@@ -297,6 +352,7 @@ static inline void MergeSort(Type* array,const unsigned long long length){
     }
     maxSortedLength=(maxSortedLength/(unsigned long long)SmallSortLength)*(unsigned long long)SmallSortLength;
     unsigned long long regularLength=(length/SmallSortLength)*SmallSortLength;
+    const bool useBranchyMerge=MostlyOrdered(array,length);
     Type* copyArray=MemoryAllocate<Type>(length);
     MergeSortStack<Type> stack;
     ClearStack(&stack);
@@ -313,7 +369,7 @@ static inline void MergeSort(Type* array,const unsigned long long length){
         while(NeedToMerge(&stack,&mergeArray0,&mergeArray1,&mergeCopyArray,&mergeLength)){
             bool exchangeArray0=true;
             if(mergeArray0[mergeLength-1]>mergeArray1[0]){
-                Merge(mergeArray0,mergeArray1,mergeCopyArray,mergeLength,mergeLength);
+                Merge(mergeArray0,mergeArray1,mergeCopyArray,mergeLength,mergeLength,useBranchyMerge);
             }else{
                 exchangeArray0=false;
                 if(mergeArray0+mergeLength!=mergeArray1){
@@ -331,7 +387,7 @@ static inline void MergeSort(Type* array,const unsigned long long length){
     while(UnequalLength::NeedToMerge(&stack,&mergeArray0,&mergeArray1,&mergeCopyArray,&mergeLength0,&mergeLength1)){
         bool exchangeArray0=true;
         if(mergeArray0[mergeLength0-1]>mergeArray1[0]){
-            Merge(mergeArray0,mergeArray1,mergeCopyArray,mergeLength0,mergeLength1);
+            Merge(mergeArray0,mergeArray1,mergeCopyArray,mergeLength0,mergeLength1,useBranchyMerge);
         }else{
             exchangeArray0=false;
             if(mergeArray0+mergeLength0!=mergeArray1){
